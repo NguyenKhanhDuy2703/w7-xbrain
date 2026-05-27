@@ -263,6 +263,197 @@
     .container { padding: 1rem; }
     .input-row { flex-direction: column; }
   }
+
+  /* ---------- Flashcards ---------- */
+  .flashcard-deck {
+    perspective: 1000px;
+    width: 100%;
+    max-width: 500px;
+    height: 280px;
+    margin: 1.5rem auto;
+  }
+  .flashcard-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
+    cursor: pointer;
+  }
+  .flashcard-inner.flipped {
+    transform: rotateY(180deg);
+  }
+  .flashcard-front, .flashcard-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    border-radius: var(--radius);
+    border: 2px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    box-shadow: var(--shadow-lg);
+  }
+  .flashcard-front {
+    background: linear-gradient(135deg, #ffffff 0%, var(--accent-light) 100%);
+    color: var(--text);
+  }
+  .flashcard-front::after {
+    content: "🔄 Click to flip to answer";
+    position: absolute;
+    bottom: 1rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .flashcard-back {
+    background: linear-gradient(135deg, var(--accent-dark) 0%, var(--accent) 100%);
+    color: white;
+    transform: rotateY(180deg);
+  }
+  .flashcard-back::after {
+    content: "🔄 Click to flip to question";
+    position: absolute;
+    bottom: 1rem;
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.7);
+  }
+  .flashcard-text {
+    font-size: 1.15rem;
+    font-weight: 500;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .deck-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+  .deck-controls button {
+    min-width: 100px;
+  }
+  .badge-btn {
+    background: var(--accent-light);
+    color: var(--accent-dark);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    border: 0;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.15s;
+    margin-left: 0.5rem;
+  }
+  .badge-btn:hover {
+    background: var(--accent);
+    color: white;
+  }
+  .badge-btn.danger {
+    background: #fee2e2;
+    color: #ef4444;
+  }
+  .card-action-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* ---------- Quiz ---------- */
+  .quiz-options {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+  }
+  @media (min-width: 640px) {
+    .quiz-options {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .quiz-opt-btn {
+    background: white;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-sm);
+    text-align: left;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .quiz-opt-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+  .quiz-opt-btn.correct {
+    background: #d1fae5;
+    border-color: var(--success);
+    color: #065f46;
+    font-weight: 600;
+  }
+  .quiz-opt-btn.incorrect {
+    background: #fee2e2;
+    border-color: var(--error);
+    color: #991b1b;
+  }
+  .quiz-opt-prefix {
+    width: 24px;
+    height: 24px;
+    background: var(--border);
+    border-radius: 50%;
+    display: inline-grid;
+    place-items: center;
+    font-size: 0.8rem;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+  .quiz-opt-btn.correct .quiz-opt-prefix {
+    background: var(--success);
+    color: white;
+  }
+  .quiz-opt-btn.incorrect .quiz-opt-prefix {
+    background: var(--error);
+    color: white;
+  }
+  .quiz-explanation {
+    background: #f8fafc;
+    border-left: 4px solid var(--accent);
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    display: none;
+    text-align: left;
+  }
+  .quiz-explanation.visible {
+    display: block;
+  }
+  .quiz-result-summary {
+    text-align: center;
+    padding: 2rem;
+  }
+  .quiz-score-circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: var(--accent-light);
+    color: var(--accent-dark);
+    display: grid;
+    place-items: center;
+    font-size: 1.75rem;
+    font-weight: bold;
+    margin: 1rem auto;
+    border: 3px solid var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -319,6 +510,68 @@
       <button class="ghost" onclick="refresh()">Refresh</button>
     </div>
     <div class="doc-list" id="docs"><div class="empty">No documents yet — upload one above.</div></div>
+  </section>
+
+  <section class="card" id="flashcard-section" style="display:none;">
+    <div class="card-header">
+      <h2><span class="step">4</span>Flashcard Review Deck</h2>
+      <span class="meta" id="flashcard-doc-title">Tài liệu</span>
+    </div>
+    
+    <div class="flashcard-deck">
+      <div class="flashcard-inner" id="flashcard-inner" onclick="flipCard()">
+        <div class="flashcard-front">
+          <div class="flashcard-text" id="flashcard-question">Câu hỏi sẽ hiển thị ở đây</div>
+        </div>
+        <div class="flashcard-back">
+          <div class="flashcard-text" id="flashcard-answer">Câu trả lời sẽ hiển thị ở đây</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="deck-controls">
+      <button class="ghost" onclick="prevCard()">Previous</button>
+      <span id="card-indicator" style="font-weight:500;">0 / 0</span>
+      <button class="ghost" onclick="nextCard()">Next</button>
+    </div>
+    
+    <div style="margin-top: 2rem;">
+      <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--muted);">Manage Flashcards</h3>
+      <div id="flashcard-list" style="display: grid; gap: 0.5rem; max-height: 250px; overflow-y: auto;">
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="quiz-section" style="display:none;">
+    <div class="card-header">
+      <h2><span class="step">5</span>Interactive Quiz</h2>
+      <span class="meta" id="quiz-doc-title">Tài liệu</span>
+    </div>
+
+    <div id="quiz-active-container">
+      <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; text-align: left;" id="quiz-question-text">
+        Câu hỏi trắc nghiệm sẽ hiển thị ở đây
+      </div>
+
+      <div class="quiz-options" id="quiz-options-container">
+      </div>
+
+      <div class="quiz-explanation" id="quiz-explanation-box">
+        <strong>Giải thích:</strong> <span id="quiz-explanation-text">Giải thích tại sao đáp án này đúng.</span>
+      </div>
+
+      <div class="deck-controls" style="margin-top: 2rem;">
+        <span id="quiz-indicator" style="font-weight:500;">Question 0 of 0</span>
+        <button class="primary" id="quiz-next-btn" onclick="nextQuizQuestion()" style="display: none;">Next Question</button>
+      </div>
+    </div>
+
+    <div id="quiz-summary-container" style="display: none;" class="quiz-result-summary">
+      <h3 style="font-size: 1.3rem; margin: 0;">Quiz Completed!</h3>
+      <div class="quiz-score-circle" id="quiz-score-display">0/0</div>
+      <p class="muted" id="quiz-score-message">Bạn đã hoàn thành bài trắc nghiệm.</p>
+      <button class="primary" onclick="restartQuiz()">Retake Quiz</button>
+    </div>
   </section>
 
   <details>
@@ -460,23 +713,271 @@ async function ask() {
 $('question').addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
 
 // ============================================================================
-// Doc list
+// Doc list & Flashcards
 // ============================================================================
+let currentFlashcards = [];
+let currentCardIndex = 0;
+let activeDocId = null;
+
+async function generateFlashcards(docId, docTitle) {
+  toast('Generating flashcards with AI...', 'info');
+  const res = await call('/flashcards/generate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({doc_id: docId, count: 5})
+  });
+  if (!res.ok) {
+    toast(`Failed to generate: ${res.body.detail || res.status}`, 'error');
+    return;
+  }
+  toast('Generated flashcards successfully!', 'success');
+  loadFlashcards(docId, docTitle);
+}
+
+async function loadFlashcards(docId, docTitle) {
+  activeDocId = docId;
+  $('flashcard-doc-title').textContent = docTitle;
+  $('flashcard-section').style.display = 'block';
+  
+  const res = await call(`/flashcards?doc_id=${docId}`);
+  if (!res.ok) {
+    toast('Failed to load flashcards', 'error');
+    return;
+  }
+  currentFlashcards = res.body.flashcards || [];
+  currentCardIndex = 0;
+  
+  renderFlashcardDeck();
+  renderFlashcardList();
+  
+  $('flashcard-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderFlashcardDeck() {
+  const inner = $('flashcard-inner');
+  inner.classList.remove('flipped');
+  
+  if (currentFlashcards.length === 0) {
+    $('flashcard-question').textContent = "No flashcards generated yet for this document.";
+    $('flashcard-answer').textContent = "Click 'Generate Cards' to create some!";
+    $('card-indicator').textContent = "0 / 0";
+    return;
+  }
+  
+  const card = currentFlashcards[currentCardIndex];
+  $('flashcard-question').textContent = card.question;
+  $('flashcard-answer').textContent = card.answer;
+  $('card-indicator').textContent = `${currentCardIndex + 1} / ${currentFlashcards.length}`;
+}
+
+function flipCard() {
+  $('flashcard-inner').classList.toggle('flipped');
+}
+
+function nextCard() {
+  if (currentFlashcards.length === 0) return;
+  currentCardIndex = (currentCardIndex + 1) % currentFlashcards.length;
+  renderFlashcardDeck();
+}
+
+function prevCard() {
+  if (currentFlashcards.length === 0) return;
+  currentCardIndex = (currentCardIndex - 1 + currentFlashcards.length) % currentFlashcards.length;
+  renderFlashcardDeck();
+}
+
+async function deleteCard(cardId) {
+  if (!confirm('Are you sure you want to delete this flashcard?')) return;
+  const res = await call(`/flashcards/${cardId}`, {method: 'DELETE'});
+  if (!res.ok) {
+    toast('Failed to delete flashcard', 'error');
+    return;
+  }
+  toast('Deleted flashcard', 'success');
+  
+  currentFlashcards = currentFlashcards.filter(c => c.id !== cardId);
+  if (currentCardIndex >= currentFlashcards.length) {
+    currentCardIndex = Math.max(0, currentFlashcards.length - 1);
+  }
+  renderFlashcardDeck();
+  renderFlashcardList();
+}
+
+function renderFlashcardList() {
+  const list = $('flashcard-list');
+  if (currentFlashcards.length === 0) {
+    list.innerHTML = '<div class="empty">No flashcards.</div>';
+    return;
+  }
+  list.innerHTML = currentFlashcards.map((c, i) => `
+    <div class="doc-item">
+      <div style="flex: 1; text-align: left;">
+        <div style="font-weight: 500;">Q: ${c.question}</div>
+        <div class="muted" style="font-size: 0.8rem; margin-top: 0.2rem;">A: ${c.answer}</div>
+      </div>
+      <div>
+        <button class="badge-btn danger" onclick="deleteCard('${c.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ============================================================================
+// Quiz
+// ============================================================================
+let currentQuizzes = [];
+let currentQuizIndex = 0;
+let quizScore = 0;
+let quizAnswered = false;
+
+async function generateQuiz(docId, docTitle) {
+  toast('Generating quiz with AI...', 'info');
+  const res = await call('/quiz/generate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({doc_id: docId, count: 5})
+  });
+  if (!res.ok) {
+    toast(`Failed to generate quiz: ${res.body.detail || res.status}`, 'error');
+    return;
+  }
+  toast('Generated quiz successfully!', 'success');
+  loadQuiz(docId, docTitle);
+}
+
+async function loadQuiz(docId, docTitle) {
+  $('quiz-doc-title').textContent = docTitle;
+  $('quiz-section').style.display = 'block';
+  
+  const res = await call(`/quiz?doc_id=${docId}`);
+  if (!res.ok) {
+    toast('Failed to load quiz', 'error');
+    return;
+  }
+  currentQuizzes = res.body.quizzes || [];
+  currentQuizIndex = 0;
+  quizScore = 0;
+  quizAnswered = false;
+  
+  if (currentQuizzes.length === 0) {
+    $('quiz-active-container').style.display = 'block';
+    $('quiz-summary-container').style.display = 'none';
+    $('quiz-question-text').textContent = "No quiz questions generated yet for this document.";
+    $('quiz-options-container').innerHTML = '';
+    $('quiz-explanation-box').classList.remove('visible');
+    $('quiz-indicator').textContent = "Question 0 of 0";
+    $('quiz-next-btn').style.display = 'none';
+  } else {
+    restartQuiz();
+  }
+  
+  $('quiz-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function restartQuiz() {
+  currentQuizIndex = 0;
+  quizScore = 0;
+  quizAnswered = false;
+  $('quiz-active-container').style.display = 'block';
+  $('quiz-summary-container').style.display = 'none';
+  renderQuizQuestion();
+}
+
+function renderQuizQuestion() {
+  quizAnswered = false;
+  $('quiz-explanation-box').classList.remove('visible');
+  $('quiz-next-btn').style.display = 'none';
+  
+  const q = currentQuizzes[currentQuizIndex];
+  $('quiz-question-text').textContent = `${currentQuizIndex + 1}. ${q.question}`;
+  $('quiz-indicator').textContent = `Question ${currentQuizIndex + 1} of ${currentQuizzes.length}`;
+  
+  const container = $('quiz-options-container');
+  container.innerHTML = q.options.map((opt, i) => {
+    const letter = ['A', 'B', 'C', 'D'][i];
+    return `
+      <button class="quiz-opt-btn" onclick="selectOption(${i})">
+        <span class="quiz-opt-prefix">${letter}</span>
+        <span>${opt.replace(/</g, '&lt;')}</span>
+      </button>
+    `;
+  }).join('');
+}
+
+function selectOption(index) {
+  if (quizAnswered) return;
+  quizAnswered = true;
+  
+  const q = currentQuizzes[currentQuizIndex];
+  const buttons = $('quiz-options-container').children;
+  
+  for (let i = 0; i < buttons.length; i++) {
+    buttons[i].disabled = true;
+    if (i === q.correct_option) {
+      buttons[i].classList.add('correct');
+    }
+  }
+  
+  if (index === q.correct_option) {
+    quizScore++;
+    toast('Correct!', 'success');
+  } else {
+    buttons[index].classList.add('incorrect');
+    toast('Incorrect!', 'error');
+  }
+  
+  $('quiz-explanation-text').textContent = q.explanation;
+  $('quiz-explanation-box').classList.add('visible');
+  
+  const isLast = currentQuizIndex === currentQuizzes.length - 1;
+  $('quiz-next-btn').textContent = isLast ? "Finish Quiz" : "Next Question";
+  $('quiz-next-btn').style.display = 'inline-block';
+}
+
+function nextQuizQuestion() {
+  if (currentQuizIndex === currentQuizzes.length - 1) {
+    $('quiz-active-container').style.display = 'none';
+    $('quiz-summary-container').style.display = 'block';
+    $('quiz-score-display').textContent = `${quizScore}/${currentQuizzes.length}`;
+    
+    let msg = "Bạn đã hoàn thành bài trắc nghiệm.";
+    const pct = quizScore / currentQuizzes.length;
+    if (pct === 1.0) msg = "Perfect! Xuất sắc đạt điểm tối đa! 🎉";
+    else if (pct >= 0.8) msg = "Tuyệt vời! Bạn nắm vững kiến thức rất tốt. 👍";
+    else if (pct >= 0.5) msg = "Khá tốt! Hãy ôn tập lại một chút nhé. 📚";
+    else msg = "Cố gắng lên! Hãy xem kỹ lại tài liệu và thử lại. 💪";
+    $('quiz-score-message').textContent = msg;
+  } else {
+    currentQuizIndex++;
+    renderQuizQuestion();
+  }
+}
+
 async function refresh() {
   const res = await call('/docs/list');
   if (!res.ok || !res.body.docs || !res.body.docs.length) {
     $('docs').innerHTML = '<div class="empty">No documents yet — upload one above.</div>';
     return;
   }
-  $('docs').innerHTML = res.body.docs.map(d => `
-    <div class="doc-item">
-      <div>
-        <div class="name">${d.filename || d.doc_id}</div>
-        <div class="meta">${(d.chars || 0).toLocaleString()} chars · ${(d.size || 0).toLocaleString()} bytes</div>
+  $('docs').innerHTML = res.body.docs.map(d => {
+    const filename = d.filename || d.doc_id;
+    const escapedFilename = filename.replace(/'/g, "\\'");
+    return `
+      <div class="doc-item" style="flex-wrap: wrap; gap: 1rem;">
+        <div style="flex: 1; min-width: 200px; text-align: left;">
+          <div class="name">${filename}</div>
+          <div class="meta">${(d.chars || 0).toLocaleString()} chars · ${(d.size || 0).toLocaleString()} bytes</div>
+        </div>
+        <div class="card-action-row" style="flex-wrap: wrap; gap: 0.25rem;">
+          <button class="badge-btn" onclick="loadFlashcards('${d.doc_id}', '${escapedFilename}')">Review Cards</button>
+          <button class="badge-btn" onclick="generateFlashcards('${d.doc_id}', '${escapedFilename}')">Gen Cards</button>
+          <button class="badge-btn" onclick="loadQuiz('${d.doc_id}', '${escapedFilename}')" style="background:#fef3c7; color:#d97706;">Take Quiz</button>
+          <button class="badge-btn" onclick="generateQuiz('${d.doc_id}', '${escapedFilename}')" style="background:#fef3c7; color:#d97706;">Gen Quiz</button>
+          <span class="meta" style="margin-left: 0.5rem;">${(d.doc_id || '').slice(0, 8)}…</span>
+        </div>
       </div>
-      <div class="meta">${(d.doc_id || '').slice(0, 8)}…</div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // ============================================================================

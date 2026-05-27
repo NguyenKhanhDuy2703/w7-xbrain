@@ -63,6 +63,72 @@ class DynamoDBUserStore:
         )
         return resp.get("Items", [])
 
+    def add_flashcard(self, user_id: str, doc_id: str, flashcard_id: str, question: str, answer: str) -> None:
+        self.table.put_item(
+            Item={
+                "user_id": user_id,
+                "sk": f"FLASHCARD#{flashcard_id}",
+                "doc_id": doc_id,
+                "flashcard_id": flashcard_id,
+                "question": question,
+                "answer": answer,
+                "created_at": _now(),
+            }
+        )
+
+    def list_flashcards(self, user_id: str, doc_id: str = None) -> list:
+        resp = self.table.query(
+            KeyConditionExpression="user_id = :u AND begins_with(sk, :p)",
+            ExpressionAttributeValues={":u": user_id, ":p": "FLASHCARD#"},
+        )
+        items = resp.get("Items", [])
+        if doc_id:
+            items = [item for item in items if item.get("doc_id") == doc_id]
+        return items
+
+    def delete_flashcard(self, user_id: str, flashcard_id: str) -> None:
+        self.table.delete_item(
+            Key={
+                "user_id": user_id,
+                "sk": f"FLASHCARD#{flashcard_id}",
+            }
+        )
+
+    def add_quiz_question(self, user_id: str, doc_id: str, quiz_id: str, question: str, options: list, correct_option: int, explanation: str) -> None:
+        self.table.put_item(
+            Item={
+                "user_id": user_id,
+                "sk": f"QUIZ#{quiz_id}",
+                "doc_id": doc_id,
+                "quiz_id": quiz_id,
+                "question": question,
+                "options": options,
+                "correct_option": correct_option,
+                "explanation": explanation,
+                "created_at": _now(),
+            }
+        )
+
+    def list_quizzes(self, user_id: str, doc_id: str = None) -> list:
+        resp = self.table.query(
+            KeyConditionExpression="user_id = :u AND begins_with(sk, :p)",
+            ExpressionAttributeValues={":u": user_id, ":p": "QUIZ#"},
+        )
+        items = resp.get("Items", [])
+        if doc_id:
+            items = [item for item in items if item.get("doc_id") == doc_id]
+        return items
+
+    def delete_quiz_question(self, user_id: str, quiz_id: str) -> None:
+        self.table.delete_item(
+            Key={
+                "user_id": user_id,
+                "sk": f"QUIZ#{quiz_id}",
+            }
+        )
+
+
+
 
 class PostgresUserStore:
     def __init__(self, url: str):
@@ -95,8 +161,30 @@ class PostgresUserStore:
                     answer TEXT,
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 );
+                CREATE TABLE IF NOT EXISTS user_flashcards (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    doc_id TEXT NOT NULL,
+                    question TEXT NOT NULL,
+                    answer TEXT NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+                CREATE TABLE IF NOT EXISTS user_quizzes (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    doc_id TEXT NOT NULL,
+                    question TEXT NOT NULL,
+                    options JSONB NOT NULL,
+                    correct_option INTEGER NOT NULL,
+                    explanation TEXT NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
                 CREATE INDEX IF NOT EXISTS user_queries_user_idx ON user_queries(user_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS user_flashcards_user_idx ON user_flashcards(user_id, doc_id);
+                CREATE INDEX IF NOT EXISTS user_quizzes_user_idx ON user_quizzes(user_id, doc_id);
             """)
+
+
 
     def add_doc(self, user_id, doc_id, metadata):
         with self.conn.cursor() as cur:
@@ -136,6 +224,76 @@ class PostgresUserStore:
                 for r in cur.fetchall()
             ]
 
+    def add_flashcard(self, user_id: str, doc_id: str, flashcard_id: str, question: str, answer: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO user_flashcards (id, user_id, doc_id, question, answer) VALUES (%s, %s, %s, %s, %s) "
+                "ON CONFLICT (id) DO UPDATE SET question = EXCLUDED.question, answer = EXCLUDED.answer",
+                (flashcard_id, user_id, doc_id, question, answer),
+            )
+
+    def list_flashcards(self, user_id: str, doc_id: str = None) -> list:
+        with self.conn.cursor() as cur:
+            if doc_id:
+                cur.execute(
+                    "SELECT id, doc_id, question, answer, created_at FROM user_flashcards WHERE user_id = %s AND doc_id = %s ORDER BY created_at DESC",
+                    (user_id, doc_id),
+                )
+            else:
+                cur.execute(
+                    "SELECT id, doc_id, question, answer, created_at FROM user_flashcards WHERE user_id = %s ORDER BY created_at DESC",
+                    (user_id,),
+                )
+            return [
+                {"id": r[0], "doc_id": r[1], "question": r[2], "answer": r[3], "created_at": r[4].isoformat()}
+                for r in cur.fetchall()
+            ]
+
+    def delete_flashcard(self, user_id: str, flashcard_id: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM user_flashcards WHERE user_id = %s AND id = %s",
+                (user_id, flashcard_id),
+            )
+
+    def add_quiz_question(self, user_id: str, doc_id: str, quiz_id: str, question: str, options: list, correct_option: int, explanation: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO user_quizzes (id, user_id, doc_id, question, options, correct_option, explanation) VALUES (%s, %s, %s, %s, %s, %s, %s) "
+                "ON CONFLICT (id) DO UPDATE SET question = EXCLUDED.question, options = EXCLUDED.options, correct_option = EXCLUDED.correct_option, explanation = EXCLUDED.explanation",
+                (quiz_id, user_id, doc_id, question, json.dumps(options), correct_option, explanation),
+            )
+
+    def list_quizzes(self, user_id: str, doc_id: str = None) -> list:
+        with self.conn.cursor() as cur:
+            if doc_id:
+                cur.execute(
+                    "SELECT id, doc_id, question, options, correct_option, explanation, created_at FROM user_quizzes WHERE user_id = %s AND doc_id = %s ORDER BY created_at DESC",
+                    (user_id, doc_id),
+                )
+            else:
+                cur.execute(
+                    "SELECT id, doc_id, question, options, correct_option, explanation, created_at FROM user_quizzes WHERE user_id = %s ORDER BY created_at DESC",
+                    (user_id,),
+                )
+            return [
+                {
+                    "id": r[0], "doc_id": r[1], "question": r[2], 
+                    "options": r[3] if isinstance(r[3], list) else json.loads(r[3]), 
+                    "correct_option": r[4], "explanation": r[5], "created_at": r[6].isoformat()
+                }
+                for r in cur.fetchall()
+            ]
+
+    def delete_quiz_question(self, user_id: str, quiz_id: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM user_quizzes WHERE user_id = %s AND id = %s",
+                (user_id, quiz_id),
+            )
+
+
+
 
 class SQLiteUserStore:
     """Local dev store. NOT for production — single-file, no concurrency, no scaling."""
@@ -162,9 +320,31 @@ class SQLiteUserStore:
                 answer TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS user_flashcards (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                doc_id TEXT NOT NULL,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS user_quizzes (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                doc_id TEXT NOT NULL,
+                question TEXT NOT NULL,
+                options TEXT NOT NULL,
+                correct_option INTEGER NOT NULL,
+                explanation TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
             CREATE INDEX IF NOT EXISTS user_queries_user_idx ON user_queries(user_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS user_flashcards_user_idx ON user_flashcards(user_id, doc_id);
+            CREATE INDEX IF NOT EXISTS user_quizzes_user_idx ON user_quizzes(user_id, doc_id);
         """)
         self.conn.commit()
+
+
 
     def add_doc(self, user_id, doc_id, metadata):
         self.conn.execute(
@@ -201,6 +381,72 @@ class SQLiteUserStore:
             for r in cur.fetchall()
         ]
 
+    def add_flashcard(self, user_id: str, doc_id: str, flashcard_id: str, question: str, answer: str) -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO user_flashcards (id, user_id, doc_id, question, answer) VALUES (?, ?, ?, ?, ?)",
+            (flashcard_id, user_id, doc_id, question, answer),
+        )
+        self.conn.commit()
+
+    def list_flashcards(self, user_id: str, doc_id: str = None) -> list:
+        if doc_id:
+            cur = self.conn.execute(
+                "SELECT id, doc_id, question, answer, created_at FROM user_flashcards WHERE user_id = ? AND doc_id = ? ORDER BY created_at DESC",
+                (user_id, doc_id),
+            )
+        else:
+            cur = self.conn.execute(
+                "SELECT id, doc_id, question, answer, created_at FROM user_flashcards WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,),
+            )
+        return [
+            {"id": r[0], "doc_id": r[1], "question": r[2], "answer": r[3], "created_at": r[4]}
+            for r in cur.fetchall()
+        ]
+
+    def delete_flashcard(self, user_id: str, flashcard_id: str) -> None:
+        self.conn.execute(
+            "DELETE FROM user_flashcards WHERE user_id = ? AND id = ?",
+            (user_id, flashcard_id),
+        )
+        self.conn.commit()
+
+    def add_quiz_question(self, user_id: str, doc_id: str, quiz_id: str, question: str, options: list, correct_option: int, explanation: str) -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO user_quizzes (id, user_id, doc_id, question, options, correct_option, explanation) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (quiz_id, user_id, doc_id, question, json.dumps(options), correct_option, explanation),
+        )
+        self.conn.commit()
+
+    def list_quizzes(self, user_id: str, doc_id: str = None) -> list:
+        if doc_id:
+            cur = self.conn.execute(
+                "SELECT id, doc_id, question, options, correct_option, explanation, created_at FROM user_quizzes WHERE user_id = ? AND doc_id = ? ORDER BY created_at DESC",
+                (user_id, doc_id),
+            )
+        else:
+            cur = self.conn.execute(
+                "SELECT id, doc_id, question, options, correct_option, explanation, created_at FROM user_quizzes WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,),
+            )
+        return [
+            {
+                "id": r[0], "doc_id": r[1], "question": r[2], 
+                "options": json.loads(r[3]) if r[3] else [], 
+                "correct_option": r[4], "explanation": r[5], "created_at": r[6]
+            }
+            for r in cur.fetchall()
+        ]
+
+    def delete_quiz_question(self, user_id: str, quiz_id: str) -> None:
+        self.conn.execute(
+            "DELETE FROM user_quizzes WHERE user_id = ? AND id = ?",
+            (user_id, quiz_id),
+        )
+        self.conn.commit()
+
+
+
 
 class DocumentDBUserStore:
     """MongoDB-compatible store. Works with AWS DocumentDB and MongoDB Atlas.
@@ -229,6 +475,12 @@ class DocumentDBUserStore:
         self.queries = self.db["user_queries"]
         self.docs.create_index([("user_id", 1), ("doc_id", 1)], unique=True)
         self.queries.create_index([("user_id", 1), ("created_at", -1)])
+        self.flashcards = self.db["user_flashcards"]
+        self.flashcards.create_index([("user_id", 1), ("doc_id", 1)])
+        self.quizzes = self.db["user_quizzes"]
+        self.quizzes.create_index([("user_id", 1), ("doc_id", 1)])
+
+
 
     def add_doc(self, user_id: str, doc_id: str, metadata: dict) -> None:
         self.docs.update_one(
@@ -253,6 +505,62 @@ class DocumentDBUserStore:
             {**{k: v for k, v in q.items() if k != "_id"}}
             for q in self.queries.find({"user_id": user_id}).sort("created_at", -1).limit(limit)
         ]
+
+    def add_flashcard(self, user_id: str, doc_id: str, flashcard_id: str, question: str, answer: str) -> None:
+        self.flashcards.update_one(
+            {"_id": flashcard_id},
+            {"$set": {
+                "_id": flashcard_id,
+                "user_id": user_id,
+                "doc_id": doc_id,
+                "question": question,
+                "answer": answer,
+                "created_at": _now()
+            }},
+            upsert=True,
+        )
+
+    def list_flashcards(self, user_id: str, doc_id: str = None) -> list:
+        query = {"user_id": user_id}
+        if doc_id:
+            query["doc_id"] = doc_id
+        return [
+            {**{k: v for k, v in f.items() if k != "_id"}, "id": f["_id"]}
+            for f in self.flashcards.find(query).sort("created_at", -1)
+        ]
+
+    def delete_flashcard(self, user_id: str, flashcard_id: str) -> None:
+        self.flashcards.delete_one({"user_id": user_id, "_id": flashcard_id})
+
+    def add_quiz_question(self, user_id: str, doc_id: str, quiz_id: str, question: str, options: list, correct_option: int, explanation: str) -> None:
+        self.quizzes.update_one(
+            {"_id": quiz_id},
+            {"$set": {
+                "_id": quiz_id,
+                "user_id": user_id,
+                "doc_id": doc_id,
+                "question": question,
+                "options": options,
+                "correct_option": correct_option,
+                "explanation": explanation,
+                "created_at": _now()
+            }},
+            upsert=True,
+        )
+
+    def list_quizzes(self, user_id: str, doc_id: str = None) -> list:
+        query = {"user_id": user_id}
+        if doc_id:
+            query["doc_id"] = doc_id
+        return [
+            {**{k: v for k, v in q.items() if k != "_id"}, "id": q["_id"]}
+            for q in self.quizzes.find(query).sort("created_at", -1)
+        ]
+
+    def delete_quiz_question(self, user_id: str, quiz_id: str) -> None:
+        self.quizzes.delete_one({"user_id": user_id, "_id": quiz_id})
+
+
 
 
 class MySQLUserStore:
@@ -299,6 +607,34 @@ class MySQLUserStore:
                     INDEX idx_user_created (user_id, created_at)
                 ) CHARACTER SET utf8mb4
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_flashcards (
+                    id VARCHAR(255) NOT NULL,
+                    user_id VARCHAR(255) NOT NULL,
+                    doc_id VARCHAR(255) NOT NULL,
+                    question TEXT NOT NULL,
+                    answer TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    INDEX idx_user_doc (user_id, doc_id)
+                ) CHARACTER SET utf8mb4
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_quizzes (
+                    id VARCHAR(255) NOT NULL,
+                    user_id VARCHAR(255) NOT NULL,
+                    doc_id VARCHAR(255) NOT NULL,
+                    question TEXT NOT NULL,
+                    options JSON NOT NULL,
+                    correct_option INTEGER NOT NULL,
+                    explanation TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    INDEX idx_user_doc (user_id, doc_id)
+                ) CHARACTER SET utf8mb4
+            """)
+
+
 
     def add_doc(self, user_id, doc_id, metadata):
         with self.conn.cursor() as cur:
@@ -336,3 +672,71 @@ class MySQLUserStore:
                 {"query": r[0], "answer": r[1], "created_at": str(r[2])}
                 for r in cur.fetchall()
             ]
+
+    def add_flashcard(self, user_id: str, doc_id: str, flashcard_id: str, question: str, answer: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "REPLACE INTO user_flashcards (id, user_id, doc_id, question, answer) VALUES (%s, %s, %s, %s, %s)",
+                (flashcard_id, user_id, doc_id, question, answer),
+            )
+
+    def list_flashcards(self, user_id: str, doc_id: str = None) -> list:
+        with self.conn.cursor() as cur:
+            if doc_id:
+                cur.execute(
+                    "SELECT id, doc_id, question, answer, created_at FROM user_flashcards WHERE user_id = %s AND doc_id = %s ORDER BY created_at DESC",
+                    (user_id, doc_id),
+                )
+            else:
+                cur.execute(
+                    "SELECT id, doc_id, question, answer, created_at FROM user_flashcards WHERE user_id = %s ORDER BY created_at DESC",
+                    (user_id,),
+                )
+            return [
+                {"id": r[0], "doc_id": r[1], "question": r[2], "answer": r[3], "created_at": str(r[4])}
+                for r in cur.fetchall()
+            ]
+
+    def delete_flashcard(self, user_id: str, flashcard_id: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM user_flashcards WHERE user_id = %s AND id = %s",
+                (user_id, flashcard_id),
+            )
+
+    def add_quiz_question(self, user_id: str, doc_id: str, quiz_id: str, question: str, options: list, correct_option: int, explanation: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "REPLACE INTO user_quizzes (id, user_id, doc_id, question, options, correct_option, explanation) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (quiz_id, user_id, doc_id, question, json.dumps(options), correct_option, explanation),
+            )
+
+    def list_quizzes(self, user_id: str, doc_id: str = None) -> list:
+        with self.conn.cursor() as cur:
+            if doc_id:
+                cur.execute(
+                    "SELECT id, doc_id, question, options, correct_option, explanation, created_at FROM user_quizzes WHERE user_id = %s AND doc_id = %s ORDER BY created_at DESC",
+                    (user_id, doc_id),
+                )
+            else:
+                cur.execute(
+                    "SELECT id, doc_id, question, options, correct_option, explanation, created_at FROM user_quizzes WHERE user_id = %s ORDER BY created_at DESC",
+                    (user_id,),
+                )
+            return [
+                {
+                    "id": r[0], "doc_id": r[1], "question": r[2], 
+                    "options": r[3] if isinstance(r[3], list) else json.loads(r[3]), 
+                    "correct_option": r[4], "explanation": r[5], "created_at": str(r[6])
+                }
+                for r in cur.fetchall()
+            ]
+
+    def delete_quiz_question(self, user_id: str, quiz_id: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM user_quizzes WHERE user_id = %s AND id = %s",
+                (user_id, quiz_id),
+            )
+
+

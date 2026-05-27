@@ -114,6 +114,76 @@ def recent(x_user_id: str | None = Header(default=None), limit: int = 10) -> dic
     return handlers.handle_recent_queries(_resolve_user_id(x_user_id), userstore, limit=limit)
 
 
+class FlashcardGenerateRequest(BaseModel):
+    doc_id: str
+    count: int = 5
+
+
+@app.post("/flashcards/generate")
+def generate_flashcards(req: FlashcardGenerateRequest, x_user_id: str | None = Header(default=None)) -> dict:
+    user_id = _resolve_user_id(x_user_id)
+    try:
+        return handlers.handle_generate_flashcards(
+            user_id=user_id,
+            doc_id=req.doc_id,
+            count=req.count,
+            storage=storage,
+            userstore=userstore,
+            ai_client=ai_client,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/flashcards")
+def list_flashcards(doc_id: str | None = None, x_user_id: str | None = Header(default=None)) -> dict:
+    user_id = _resolve_user_id(x_user_id)
+    return handlers.handle_list_flashcards(user_id, doc_id, userstore)
+
+
+@app.delete("/flashcards/{flashcard_id}")
+def delete_flashcard(flashcard_id: str, x_user_id: str | None = Header(default=None)) -> dict:
+    user_id = _resolve_user_id(x_user_id)
+    return handlers.handle_delete_flashcard(user_id, flashcard_id, userstore)
+
+
+class QuizGenerateRequest(BaseModel):
+    doc_id: str
+    count: int = 5
+
+
+@app.post("/quiz/generate")
+def generate_quiz(req: QuizGenerateRequest, x_user_id: str | None = Header(default=None)) -> dict:
+    user_id = _resolve_user_id(x_user_id)
+    try:
+        return handlers.handle_generate_quiz(
+            user_id=user_id,
+            doc_id=req.doc_id,
+            count=req.count,
+            storage=storage,
+            userstore=userstore,
+            ai_client=ai_client,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/quiz")
+def list_quizzes(doc_id: str | None = None, x_user_id: str | None = Header(default=None)) -> dict:
+    user_id = _resolve_user_id(x_user_id)
+    return handlers.handle_list_quizzes(user_id, doc_id, userstore)
+
+
+@app.delete("/quiz/{quiz_id}")
+def delete_quiz(quiz_id: str, x_user_id: str | None = Header(default=None)) -> dict:
+    user_id = _resolve_user_id(x_user_id)
+    return handlers.handle_delete_quiz(user_id, quiz_id, userstore)
+
+
 # ---- Static frontend ----
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
